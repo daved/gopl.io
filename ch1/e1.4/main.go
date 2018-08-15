@@ -15,19 +15,21 @@ type data struct {
 func main() {
 	counts := make(map[string]*data)
 	files := os.Args[1:]
+
 	if len(files) == 0 {
 		countLines(os.Stdin, counts)
-	} else {
-		for _, arg := range files {
-			f, err := os.Open(arg)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "dup2: %v\n", err)
-				continue
-			}
-			countLines(f, counts)
-			_ = f.Close()
-		}
 	}
+	for _, arg := range files {
+		f, err := os.Open(arg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "dup2: %v\n", err)
+			continue
+		}
+		defer func() { _ = f.Close() }()
+
+		countLines(f, counts)
+	}
+
 	for line, d := range counts {
 		if d.ct > 1 {
 			fs := strings.Join(d.files, " ")
@@ -40,9 +42,11 @@ func countLines(f *os.File, counts map[string]*data) {
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		t := sc.Text()
+
 		if _, ok := counts[t]; !ok {
 			counts[t] = &data{}
 		}
+
 		counts[t].ct++
 		counts[t].files = appendMissing(counts[t].files, f.Name())
 	}
