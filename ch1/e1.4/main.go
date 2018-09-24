@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -19,13 +20,14 @@ func main() {
 	if len(files) == 0 {
 		countLines(os.Stdin, counts)
 	}
-	for _, arg := range files {
-		f, err := os.Open(arg)
+
+	for _, file := range files {
+		f, err := os.Open(path.Clean(file))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "dup2: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "dup2: %v\n", err)
 			continue
 		}
-		defer func() { _ = f.Close() }()
+		defer f.Close() //nolint
 
 		countLines(f, counts)
 	}
@@ -53,12 +55,12 @@ func countLines(f *os.File, counts map[string]*data) {
 	// NOTE: ignoring potential errors from input.Err()
 }
 
-func appendMissing(ss []string, new string) []string {
+func appendMissing(ss []string, a string) []string {
 	for _, s := range ss {
-		if s == new {
+		if s == a {
 			return ss
 		}
 	}
 
-	return append(ss, new)
+	return append(ss, a)
 }
