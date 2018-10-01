@@ -9,34 +9,41 @@ import (
 	"strings"
 )
 
-var (
-	protoPfx = "https://"
+const (
+	nonProto = "http://"
+	secProto = "https://"
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err) //nolint
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	for _, url := range os.Args[1:] {
-		if !strings.HasPrefix(url, protoPfx[:4]) {
-			url = protoPfx + url
+		if !strings.HasPrefix(url, nonProto) && !strings.HasPrefix(url, secProto) {
+			url = secProto + url
 		}
 
 		resp, err := http.Get(url)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "fetch: %v\n", err) //nolint
-			os.Exit(1)
+			return fmt.Errorf("fetch: %s", err)
 		}
 		defer resp.Body.Close() //nolint
 
 		if n, err := io.Copy(os.Stdout, resp.Body); err != nil {
-			pfx := ""
 			if n > 0 {
-				pfx = "\n"
+				fmt.Println()
 			}
 
-			fmt.Fprintf(os.Stderr, "%sfetch: reading %s: %v\n", pfx, url, err) //nolint
-			os.Exit(1)
+			return fmt.Errorf("fetch: reading %s: %s", url, err)
 		}
 		fmt.Println()
 
 		fmt.Printf("status: %s\n", resp.Status)
 	}
+
+	return nil
 }
