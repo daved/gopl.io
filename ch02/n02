@@ -1,0 +1,9 @@
+25 keywords, ~3 dozen predeclared names
+Short entity names are to be preferred (larger scope, longer name)
+Camelcase, initialisms HTTPThing and httpThing depending on exporting
+4 major declarations - var, const, type, func
+a pointer is the address of a variable
+a package’s name matches the last segment of its import path
+lexical block refers to a scope (universe, package, file, for, if, switch, case, syntactic block)
+for has two blocks, body and initialization/condition/post - similar to if and switch
+short var names provoke awareness of scope

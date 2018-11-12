@@ -1,0 +1,7 @@
+package main
+gofmt
+for initialization; condition; post := range
+Printf formatting
+Call close func if available.
+sync (sync.Mutex) synchronizes access
+switch can be "tagless" and does not fallthrough by nature
