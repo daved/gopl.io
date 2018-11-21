@@ -7,3 +7,4 @@ a package’s name matches the last segment of its import path
 lexical block refers to a scope (universe, package, file, for, if, switch, case, syntactic block)
 for has two blocks, body and initialization/condition/post - similar to if and switch
 short var names provoke awareness of scope
+generally unsigned numbers only for bitwise ops
