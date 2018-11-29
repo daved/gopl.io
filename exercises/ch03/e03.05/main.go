@@ -55,12 +55,12 @@ func makeColorByGrayscale(n uint8) color.RGBA {
 type colorOffset uint8
 
 const (
-	scaleMax uint8 = 255
-	center         = 127
-	lowerBnd       = 84
-	upperBnd       = 170
-	extLower       = 42
-	extUpper       = 212
+	scaleMax = 255
+	center   = 127
+	lowerBnd = 84
+	upperBnd = 170
+	extLower = 42
+	extUpper = 212
 
 	redOffset   colorOffset = extLower
 	greenOffset             = center
