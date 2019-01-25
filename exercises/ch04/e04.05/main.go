@@ -3,28 +3,16 @@ package main
 import "fmt"
 
 func dedup(s []string) []string {
-	var c int
+	c := 1
 
 	for i := 1; i < len(s); i++ {
-		if s[i] == "" {
-			continue
-		}
-
-		if s[i-1] == "" {
-			s[i-c] = s[i]
-			s[i] = ""
-			i -= c + 1
-			continue
-		}
-
-		if s[i] == s[i-1] {
+		if s[i] != s[c-1] {
+			s[c] = s[i]
 			c++
-			s[i] = ""
 		}
 	}
 
-	lc := len(s) - c
-	return s[:lc:lc]
+	return s[:c:c]
 }
 
 func main() {
