@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"unicode/utf8"
+)
 
 func size(b byte) int {
 	var c int
@@ -33,9 +36,32 @@ func reverse(bs []byte) {
 	}
 }
 
-func main() {
-	bs := []byte("th界is is a test")
+func reverseu(bs []byte) {
+	rev := func(s []byte) {
+		for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+			s[i], s[j] = s[j], s[i]
+		}
+	}
 
-	reverse(bs)
+	var size int
+	for i := 0; i < len(bs); i += size {
+		_, size = utf8.DecodeRune(bs[i:])
+		if size > 1 {
+			rev(bs[i : i+size])
+		}
+	}
+
+	rev(bs)
+}
+
+func main() {
+	s := "th界is is a test"
+
+	bs := []byte(s)
+	reverse(bs) // faster
+	fmt.Println(string(bs))
+
+	bs = []byte(s)
+	reverse(bs) // more readable
 	fmt.Println(string(bs))
 }
