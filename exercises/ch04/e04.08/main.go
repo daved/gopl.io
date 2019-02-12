@@ -9,6 +9,36 @@ import (
 	"unicode/utf8"
 )
 
+type countDisplay struct {
+	format string
+	ct     int
+}
+
+func display(cds ...countDisplay) {
+	for _, cd := range cds {
+		if cd.ct > 0 {
+			fmt.Printf(cd.format, cd.ct)
+		}
+	}
+}
+
+func isInvalid(r rune, byteCt int) bool {
+	return r == unicode.ReplacementChar && byteCt == 1
+}
+
+func eofTrip(err error) bool {
+	if err == io.EOF {
+		return true
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "charcount: %v\n", err)
+		os.Exit(1)
+	}
+
+	return false
+}
+
 func main() {
 	rcs := make(map[rune]int)
 	var ulens [utf8.UTFMax + 1]int
@@ -18,14 +48,10 @@ func main() {
 	in := bufio.NewReader(os.Stdin)
 	for {
 		r, n, err := in.ReadRune()
-		if err == io.EOF {
+		if eofTrip(err) {
 			break
 		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "charcount: %v\n", err)
-			os.Exit(1)
-		}
-		if r == unicode.ReplacementChar && n == 1 {
+		if isInvalid(r, n) {
 			invalid++
 			continue
 		}
@@ -57,19 +83,13 @@ func main() {
 		}
 	}
 
-	if invalid > 0 {
-		fmt.Printf("\n%d invalid UTF-8 characters\n", invalid)
+	cds := []countDisplay{
+		{"\n%d invalid UTF-8 characters\n", invalid},
+		{"\n%d letters\n", ltrs},
+		{"\n%d digits\n", dgts},
+		{"\n%d spaces\n", spcs},
+		{"\n%d punctuations\n", pncs},
 	}
-	if ltrs > 0 {
-		fmt.Printf("\n%d letters\n", ltrs)
-	}
-	if dgts > 0 {
-		fmt.Printf("\n%d digits\n", dgts)
-	}
-	if spcs > 0 {
-		fmt.Printf("\n%d spaces\n", spcs)
-	}
-	if pncs > 0 {
-		fmt.Printf("\n%d punctuations\n", pncs)
-	}
+
+	display(cds...)
 }
