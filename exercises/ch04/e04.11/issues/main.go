@@ -1,4 +1,3 @@
-// Issues prints a table of GitHub issues matching the search terms.
 package main
 
 import (
@@ -32,12 +31,20 @@ func main() {
 	printIssues(iss)
 
 	i, err := m.CreateIssue(
-		"Second programmatic test",
-		"This is the second body. There are many like it, but this one is a second test.",
+		"Programmatic test at "+time.Now().String(),
+		"This is the body. There are many like it, but this one is a test.",
 	)
 	trip(err)
 
-	i, err = m.UpdateIssue(i.Number, "", "", github.StateClosed)
+	i, err = m.UpdateIssue(i.Number, "", "", github.Closed)
+	trip(err)
+
+	err = m.LockIssue(i.Number, github.TooHeated)
+	trip(err)
+
+	time.Sleep(time.Second * 20)
+
+	err = m.UnlockIssue(i.Number)
 	trip(err)
 
 	iss, err = m.SearchIssues(os.Args[1:])

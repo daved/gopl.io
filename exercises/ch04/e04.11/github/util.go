@@ -46,6 +46,10 @@ func sendDecode(method, url string, hs headers, data, v interface{}) error {
 		return fmt.Errorf("query failed: %s", res.Status)
 	}
 
+	if v == nil {
+		return nil
+	}
+
 	return json.NewDecoder(res.Body).Decode(&v)
 }
 

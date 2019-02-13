@@ -10,10 +10,21 @@ import (
 // IssueState ...
 type IssueState string
 
-// State{status} ...
+// Issue States ...
 const (
-	StateOpen   IssueState = "open"
-	StateClosed IssueState = "closed"
+	Open   IssueState = "open"
+	Closed IssueState = "closed"
+)
+
+// LockReason ...
+type LockReason string
+
+// Lock Reasons ...
+const (
+	OffTopic  LockReason = "off-topic"
+	TooHeated LockReason = "too heated"
+	Resolved  LockReason = "resolved"
+	Spam      LockReason = "spam"
 )
 
 // AccessMgmt ...
@@ -23,6 +34,7 @@ type AccessMgmt struct {
 	repoSrch string
 	crudPath string
 	srchPath string
+	lockSufx string
 	hdrs     headers
 }
 
@@ -40,6 +52,7 @@ func NewAccessMgmt(user, token, owner, repo string) (*AccessMgmt, error) {
 		repoSrch: "repo:" + owner + "/" + repo,
 		crudPath: "/repos/" + owner + "/" + repo + "/issues",
 		srchPath: "/search/issues",
+		lockSufx: "/lock",
 		hdrs: headers{
 			verHdr,
 			authHdr,
@@ -57,7 +70,7 @@ func (m *AccessMgmt) CreateIssue(title, body string) (*IssueResponse, error) {
 
 	method := http.MethodPost
 	url := m.urlPrfx + m.crudPath
-	req := IssueRequest{
+	req := issueRequest{
 		Title: title,
 		Body:  body,
 	}
@@ -71,8 +84,20 @@ func (m *AccessMgmt) CreateIssue(title, body string) (*IssueResponse, error) {
 }
 
 // ReadIssue ...
-func (m *AccessMgmt) ReadIssue() error {
-	return nil
+func (m *AccessMgmt) ReadIssue(num int) (*IssueResponse, error) {
+	if !m.repoSet {
+		return nil, ErrRepoNotSet
+	}
+
+	method := http.MethodGet
+	url := fmt.Sprintf("%s%s/%d", m.urlPrfx, m.crudPath, num)
+
+	var res IssueResponse
+	if err := sendDecode(method, url, m.hdrs, nil, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
 }
 
 // UpdateIssue ...
@@ -82,8 +107,8 @@ func (m *AccessMgmt) UpdateIssue(num int, title, body string, state IssueState) 
 	}
 
 	method := http.MethodPatch
-	url := m.urlPrfx + m.crudPath + fmt.Sprintf("/%d", num)
-	req := IssueRequest{
+	url := fmt.Sprintf("%s%s/%d", m.urlPrfx, m.crudPath, num)
+	req := issueRequest{
 		Title: title,
 		Body:  body,
 		State: state,
@@ -97,9 +122,32 @@ func (m *AccessMgmt) UpdateIssue(num int, title, body string, state IssueState) 
 	return &res, nil
 }
 
-// DeleteIssue ...
-func (m *AccessMgmt) DeleteIssue() error {
-	return nil
+// LockIssue ...
+func (m *AccessMgmt) LockIssue(num int, rsn LockReason) error {
+	if !m.repoSet {
+		return ErrRepoNotSet
+	}
+
+	method := http.MethodPut
+	url := fmt.Sprintf("%s%s/%d%s", m.urlPrfx, m.crudPath, num, m.lockSufx)
+	req := issueDeleteRequest{
+		Locked: true,
+		Reason: rsn,
+	}
+
+	return sendDecode(method, url, m.hdrs, &req, nil)
+}
+
+// UnlockIssue ...
+func (m *AccessMgmt) UnlockIssue(num int) error {
+	if !m.repoSet {
+		return ErrRepoNotSet
+	}
+
+	method := http.MethodDelete
+	url := fmt.Sprintf("%s%s/%d%s", m.urlPrfx, m.crudPath, num, m.lockSufx)
+
+	return sendDecode(method, url, m.hdrs, nil, nil)
 }
 
 // SearchIssues queries the GitHub issue tracker.
