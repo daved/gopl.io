@@ -29,27 +29,37 @@ func main() {
 }
 
 func handleIssuesFunc(user, token string) http.HandlerFunc {
-	var tmpl = template.Must(template.New("tmpl").Parse(
-		`<h1>{{.TotalCount}} issues</h1>
+	var tmpl = template.Must(template.New("tmpl").Funcs(
+		template.FuncMap{"preview": preview, "age": age},
+	).Parse(`
+<h1>{{ len . }} issues</h1>
 <table>
   <tr style='text-align: left'>
     <th>#</th>
 	<th>State</th>
+	<th>Age</th>
 	<th>User</th>
 	<th>Title</th>
+	<th>Milestone</th>
   </tr>
-{{range .Items}}  <tr>
+  {{ range . }}<tr>
     <td>
-	  <a href='{{.HTMLURL}}'>{{.Number}}
+	  <a href='{{ .HTMLURL }}'>{{ .Number }}</a>
     </td>
-	<td>{{.State}}</td>
+	<td>{{ .State }}</td>
+	<td>{{ .CreatedAt | age }}</td>
 	<td>
-	  <a href='{{.User.HTMLURL}}'>{{.User.Login}}</a>
+	  <a href='{{ .User.HTMLURL }}'>{{ .User.Login }}</a>
 	</td>
 	<td>
-	  <a href='{{.HTMLURL}}'>{{.Title}}</a>
+	  <a href='{{ .HTMLURL }}'>{{ .Title | preview 48 }}</a>
 	</td>
-  </tr>{{end}}
+	<td>
+	  {{ if .Milestone }}
+	  <a href='{{ .Milestone.HTMLURL }}'>{{ .Milestone.Title | preview 24 }}</a>
+	  {{ end }}
+	</td>
+  </tr>{{ end }}
 </table>
 `))
 
@@ -74,14 +84,16 @@ func handleIssuesFunc(user, token string) http.HandlerFunc {
 			return
 		}
 
-		iss, err := m.SearchIssues(os.Args[1:])
+		iss, err := m.ReadIssues()
 		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
 			stts := http.StatusInternalServerError
 			http.Error(w, http.StatusText(stts), stts)
 			return
 		}
 
 		if err := tmpl.Execute(w, iss); err != nil {
+			fmt.Fprintln(os.Stderr, err)
 			stts := http.StatusInternalServerError
 			http.Error(w, http.StatusText(stts), stts)
 			return
@@ -115,6 +127,13 @@ func printIssues(iss *github.IssuesSearchResponse) {
 			age(i.CreatedAt),
 		)
 	}
+}
+
+func preview(l int, s string) string {
+	if len(s) < l {
+		return s
+	}
+	return s[:l] + "..."
 }
 
 func age(t time.Time) string {

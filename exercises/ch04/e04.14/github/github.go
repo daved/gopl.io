@@ -100,6 +100,23 @@ func (m *AccessMgmt) ReadIssue(num int) (*IssueResponse, error) {
 	return &res, nil
 }
 
+// ReadIssues ...
+func (m *AccessMgmt) ReadIssues() ([]*IssueResponse, error) {
+	if !m.repoSet {
+		return nil, ErrRepoNotSet
+	}
+
+	method := http.MethodGet
+	url := fmt.Sprintf("%s%s?state=all", m.urlPrfx, m.crudPath)
+
+	var res []*IssueResponse
+	if err := sendDecode(method, url, m.hdrs, nil, &res); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // UpdateIssue ...
 func (m *AccessMgmt) UpdateIssue(num int, title, body string, state IssueState) (*IssueResponse, error) {
 	if !m.repoSet {
