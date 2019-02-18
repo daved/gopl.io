@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -23,15 +24,70 @@ func main() {
 	trip(err)
 
 	m := http.NewServeMux()
-	m.HandleFunc("/", handleIssuesFunc(user, token))
+	m.Handle("/", wildcardRoutes{
+		"":           redirectAddSegFunc("issues"),
+		"issues":     handleIssuesFunc(user, token),
+		"milestones": handleMilestonesFunc(user, token),
+		"users":      handleUsersFunc(user, token),
+	})
 
 	trip(http.ListenAndServe(":8042", m))
 }
 
+func lookupEnv(key string) (string, error) {
+	val, ok := os.LookupEnv(key)
+	if !ok {
+		return "", fmt.Errorf("cannot get envvar %s", key)
+	}
+	return val, nil
+}
+
+func trip(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+type wildcardRoutes map[string]http.HandlerFunc
+
+func (m wildcardRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	owner, repo, route := firstThreeSegments(r.URL.Path)
+
+	fn, ok := m[route]
+	if owner == "" || repo == "" || !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	fn(w, r)
+}
+
+func firstThreeSegments(s string) (string, string, string) {
+	segs := strings.Split(s, "/")
+
+	var a, b, c string
+
+	if len(segs) > 1 {
+		a = segs[1]
+	}
+	if len(segs) > 2 {
+		b = segs[2]
+	}
+	if len(segs) > 3 {
+		c = segs[3]
+	}
+
+	return a, b, c
+}
+
+func redirectAddSegFunc(seg string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, path.Join(r.URL.Path, seg), http.StatusPermanentRedirect)
+	}
+}
+
 func handleIssuesFunc(user, token string) http.HandlerFunc {
-	var tmpl = template.Must(template.New("tmpl").Funcs(
-		template.FuncMap{"preview": preview, "age": age},
-	).Parse(`
+	var tmpl = template.Must(newTemplate().Parse(`
 <h1>{{ len . }} issues</h1>
 <table>
   <tr style='text-align: left'>
@@ -43,17 +99,11 @@ func handleIssuesFunc(user, token string) http.HandlerFunc {
 	<th>Milestone</th>
   </tr>
   {{ range . }}<tr>
-    <td>
-	  <a href='{{ .HTMLURL }}'>{{ .Number }}</a>
-    </td>
+    <td><a href='{{ .HTMLURL }}'>{{ .Number }}</a></td>
 	<td>{{ .State }}</td>
 	<td>{{ .CreatedAt | age }}</td>
-	<td>
-	  <a href='{{ .User.HTMLURL }}'>{{ .User.Login }}</a>
-	</td>
-	<td>
-	  <a href='{{ .HTMLURL }}'>{{ .Title | preview 48 }}</a>
-	</td>
+	<td><a href='{{ .User.HTMLURL }}'>{{ .User.Login }}</a></td>
+	<td><a href='{{ .HTMLURL }}'>{{ .Title | preview 48 }}</a></td>
 	<td>
 	  {{ if .Milestone }}
 	  <a href='{{ .Milestone.HTMLURL }}'>{{ .Milestone.Title | preview 24 }}</a>
@@ -64,19 +114,7 @@ func handleIssuesFunc(user, token string) http.HandlerFunc {
 `))
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		segs := strings.Split(r.URL.Path, "/")
-		if len(segs) != 3 {
-			http.NotFound(w, r)
-			return
-		}
-
-		owner := segs[1]
-		repo := segs[2]
-
-		if owner == "" || repo == "" {
-			http.NotFound(w, r)
-			return
-		}
+		owner, repo, _ := firstThreeSegments(r.URL.Path)
 
 		m, err := github.NewAccessMgmt(user, token, owner, repo)
 		if err != nil {
@@ -101,31 +139,109 @@ func handleIssuesFunc(user, token string) http.HandlerFunc {
 	}
 }
 
-func trip(err error) {
-	if err != nil {
-		panic(err)
+func handleMilestonesFunc(user, token string) http.HandlerFunc {
+	var tmpl = template.Must(newTemplate().Parse(`
+<h1>{{ len . }} issues</h1>
+<table>
+  <tr style='text-align: left'>
+    <th>#</th>
+	<th>State</th>
+	<th>Age</th>
+	<th>User</th>
+	<th>Title</th>
+	<th>Milestone</th>
+  </tr>
+  {{ range . }}<tr>
+    <td><a href='{{ .HTMLURL }}'>{{ .Number }}</a></td>
+	<td>{{ .State }}</td>
+	<td>{{ .CreatedAt | age }}</td>
+	<td><a href='{{ .User.HTMLURL }}'>{{ .User.Login }}</a></td>
+	<td><a href='{{ .HTMLURL }}'>{{ .Title | preview 48 }}</a></td>
+	<td>
+	  {{ if .Milestone }}
+	  <a href='{{ .Milestone.HTMLURL }}'>{{ .Milestone.Title | preview 24 }}</a>
+	  {{ end }}
+	</td>
+  </tr>{{ end }}
+</table>
+`))
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		owner, repo, _ := firstThreeSegments(r.URL.Path)
+
+		m, err := github.NewAccessMgmt(user, token, owner, repo)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		iss, err := m.ReadIssues()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			stts := http.StatusInternalServerError
+			http.Error(w, http.StatusText(stts), stts)
+			return
+		}
+
+		if err := tmpl.Execute(w, iss); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			stts := http.StatusInternalServerError
+			http.Error(w, http.StatusText(stts), stts)
+			return
+		}
 	}
 }
 
-func lookupEnv(key string) (string, error) {
-	val, ok := os.LookupEnv(key)
-	if !ok {
-		return "", fmt.Errorf("cannot get envvar %s", key)
-	}
-	return val, nil
-}
+func handleUsersFunc(user, token string) http.HandlerFunc {
+	var tmpl = template.Must(newTemplate().Parse(`
+<h1>{{ len . }} issues</h1>
+<table>
+  <tr style='text-align: left'>
+    <th>#</th>
+	<th>State</th>
+	<th>Age</th>
+	<th>User</th>
+	<th>Title</th>
+	<th>Milestone</th>
+  </tr>
+  {{ range . }}<tr>
+    <td><a href='{{ .HTMLURL }}'>{{ .Number }}</a></td>
+	<td>{{ .State }}</td>
+	<td>{{ .CreatedAt | age }}</td>
+	<td><a href='{{ .User.HTMLURL }}'>{{ .User.Login }}</a></td>
+	<td><a href='{{ .HTMLURL }}'>{{ .Title | preview 48 }}</a></td>
+	<td>
+	  {{ if .Milestone }}
+	  <a href='{{ .Milestone.HTMLURL }}'>{{ .Milestone.Title | preview 24 }}</a>
+	  {{ end }}
+	</td>
+  </tr>{{ end }}
+</table>
+`))
 
-func printIssues(iss *github.IssuesSearchResponse) {
-	fmt.Printf("%d issues:\n", iss.TotalCount)
+	return func(w http.ResponseWriter, r *http.Request) {
+		owner, repo, _ := firstThreeSegments(r.URL.Path)
 
-	for _, i := range iss.Items {
-		fmt.Printf(
-			"#%-5d %9.9s %-55.55s %10.10s\n",
-			i.Number,
-			i.User.Login,
-			i.Title,
-			age(i.CreatedAt),
-		)
+		m, err := github.NewAccessMgmt(user, token, owner, repo)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		iss, err := m.ReadIssues()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			stts := http.StatusInternalServerError
+			http.Error(w, http.StatusText(stts), stts)
+			return
+		}
+
+		if err := tmpl.Execute(w, iss); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			stts := http.StatusInternalServerError
+			http.Error(w, http.StatusText(stts), stts)
+			return
+		}
 	}
 }
 
@@ -150,4 +266,13 @@ func age(t time.Time) string {
 	}
 
 	return s
+}
+
+func newTemplate() *template.Template {
+	return template.New("tmpl").Funcs(
+		template.FuncMap{
+			"preview": preview,
+			"age":     age,
+		},
+	)
 }
