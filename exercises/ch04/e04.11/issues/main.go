@@ -116,12 +116,15 @@ var explanation = `Guide:
 - practice repository
   - Set this repo's "owner" as an environment variable. (euggo)
   - Set this repo's "name" as an environment variable. (praxis)
+  - Request "write" access for euggo/praxis so that you can lock issues.
+    - Access can be granted by project admins (Greg, Nathan, Daved).
+    - Alternately, skip the "lock/unlock portion of the exercise."
 - "github" library
   - Should not have any credentials hardcoded.
   - Should implement Create, Read, Update, Lock, Unlock, and Search.
   - Should make using it's API as convenient as possible.
 - "main" application
-  - Should pull credentials (user, token, owner, repo) from environment variables.
+  - Should pull credentials (user, token, owner, repo) from environment variables or flags.
   - Should generally make use of your github library.
   - *User/Token usage: https://golang.org/pkg/net/http/#Request.SetBasicAuth
   - *User/Token advanced: https://stackoverflow.com/questions/16673766/basic-http-auth-in-go
