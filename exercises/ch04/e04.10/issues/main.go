@@ -16,6 +16,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	t := time.Now()
+	d := time.Hour * 24
+	fs := ageFilters{
+		{">  1 year", t.Add(d * -365).After},
+		{"> 60 days", t.Add(d * -60).After},
+		{"< 60 days", t.Add(d).After},
+	}
+
 	fmt.Printf("%d issues:\n", result.TotalCount)
 
 	for _, item := range result.Items {
@@ -24,23 +32,23 @@ func main() {
 			item.Number,
 			item.User.Login,
 			item.Title,
-			age(item.CreatedAt),
+			fs.age(item.CreatedAt),
 		)
 	}
 }
 
-func age(t time.Time) string {
-	var s string
-	now := time.Now()
+type ageFilter struct {
+	s  string
+	fn func(time.Time) bool
+}
 
-	switch {
-	case t.Before(now.Add(time.Hour * 24 * -365)):
-		s = ">  1 year"
-	case t.Before(now.Add(time.Hour * 24 * -60)):
-		s = "> 60 days"
-	default:
-		s = "< 60 days"
+type ageFilters []ageFilter
+
+func (fs ageFilters) age(t time.Time) string {
+	for _, f := range fs {
+		if f.fn(t) {
+			return f.s
+		}
 	}
-
-	return s
+	return "unknown age"
 }
